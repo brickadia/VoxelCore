@@ -7,6 +7,7 @@
 #include "VoxelMinimal/Containers/VoxelArray.h"
 #include "VoxelMinimal/Utilities/VoxelTypeUtilities.h"
 #include "VoxelMinimal/Utilities/VoxelHashUtilities.h"
+#include "VoxelMinimal/VoxelSharedPtr.h"
 
 // Minimize padding by using the best of all possible permutation between Key, Value and NextElementIndex
 // In practice we only need to check two permutations:
@@ -87,6 +88,15 @@ struct TVoxelDefaultMapAllocator
 
 	using FHashArray = TVoxelArray<int32>;
 	using FElementArray = TVoxelArray<TVoxelMapElement<KeyType, ValueType>>;
+};
+
+template<typename KeyType, typename ValueType>
+struct TVoxelMemStackMapAllocator
+{
+	static constexpr int32 MinHashSize = 0;
+
+	using FHashArray = TVoxelArray<int32, TMemStackAllocator<>>;
+	using FElementArray = TVoxelArray<TVoxelMapElement<KeyType, ValueType>, TMemStackAllocator<>>;
 };
 
 // Simple map with an array of elements and a hash table

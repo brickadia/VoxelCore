@@ -4,6 +4,7 @@
 
 #include "VoxelCoreMinimal.h"
 #include "VoxelMinimal/VoxelIterate.h"
+#include "VoxelMinimal/VoxelIntBox.h"
 
 struct VOXELCORE_API FVoxelBitArrayHelpers
 {

@@ -4,6 +4,7 @@
 
 #include "VoxelCoreMinimal.h"
 #include "VoxelMinimal/Containers/VoxelArray.h"
+#include "VoxelMinimal/Utilities/VoxelArrayUtilities.h"
 #include "VoxelMinimal/Utilities/VoxelHashUtilities.h"
 
 template<typename Type>

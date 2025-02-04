@@ -14,7 +14,8 @@ public class VoxelCore : ModuleRules
 		PrivatePCHHeaderFile = "Public/VoxelMinimal.h";
 
 		if (Target.Configuration == UnrealTargetConfiguration.Debug ||
-		    Target.Configuration == UnrealTargetConfiguration.DebugGame)
+		    Target.Configuration == UnrealTargetConfiguration.DebugGame ||
+		    Target.bBuildEditor)
 		{
 			PublicDefinitions.Add("VOXEL_DEBUG=1");
 		}
@@ -43,7 +44,7 @@ public class VoxelCore : ModuleRules
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				"Chaos",
+//				"Chaos",
 				"zlib",
 				"UElibPNG",
 				"HTTP",

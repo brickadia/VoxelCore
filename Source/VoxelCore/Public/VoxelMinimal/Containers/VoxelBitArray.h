@@ -4,6 +4,7 @@
 
 #include "VoxelCoreMinimal.h"
 #include "VoxelMinimal/Containers/VoxelBitArrayHelpers.h"
+#include "VoxelMinimal/VoxelAtomic.h"
 
 class FVoxelBitReference
 {

@@ -75,10 +75,6 @@ struct TLess<FIntVector>
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-FORCEINLINE FIntVector operator-(const FIntVector& Vector)
-{
-	return FIntVector(-Vector.X, -Vector.Y, -Vector.Z);
-}
 FORCEINLINE FIntVector operator-(const FIntVector& Vector, const int32 Value)
 {
 	return Vector - FIntVector(Value);
@@ -106,11 +102,6 @@ FIntVector operator-(T A, const FIntVector& V) = delete;
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-
-FORCEINLINE FInt64Vector3 operator-(const FInt64Vector3& Vector)
-{
-	return FInt64Vector3(-Vector.X, -Vector.Y, -Vector.Z);
-}
 
 FORCEINLINE FInt64Vector3 operator-(const FInt64Vector3& Vector, const int32 Value)
 {
@@ -189,10 +180,6 @@ FORCEINLINE FIntVector operator*(const FIntVector& Vector, const uint32 Value)
 {
 	checkVoxelSlow(Value <= MAX_int32);
 	return Vector * FIntVector(int32(Value));
-}
-FORCEINLINE FIntVector operator*(const FIntVector& A, const FIntVector& B)
-{
-	return FIntVector(A.X * B.X, A.Y * B.Y, A.Z * B.Z);
 }
 
 template<typename T>

@@ -19,7 +19,7 @@
 #endif
 
 #ifndef VOXEL_DEBUG
-#define VOXEL_DEBUG DO_CHECK
+#define VOXEL_DEBUG (DO_CHECK && !UE_BUILD_SHIPPING)
 #endif
 
 #if INTELLISENSE_PARSER

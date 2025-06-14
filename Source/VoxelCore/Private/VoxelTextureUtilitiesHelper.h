@@ -21,10 +21,10 @@ public:
 			ensure(TextureFinder.Object);
 		}
 
-		{
-			static ConstructorHelpers::FObjectFinder<UTexture2DArray> TextureFinder(
-				TEXT("/Script/Engine.Texture2DArray'/Voxel/Default/DefaultTextureArray.DefaultTextureArray'"));
-			ensure(TextureFinder.Object);
-		}
+//		{
+//			static ConstructorHelpers::FObjectFinder<UTexture2DArray> TextureFinder(
+//				TEXT("/Script/Engine.Texture2DArray'/Voxel/Default/DefaultTextureArray.DefaultTextureArray'"));
+//			ensure(TextureFinder.Object);
+//		}
 	}
 };

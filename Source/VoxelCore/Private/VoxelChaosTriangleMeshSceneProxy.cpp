@@ -1,5 +1,7 @@
 ﻿// Copyright Voxel Plugin SAS. All Rights Reserved.
 
+#if !BR_OBLITERATE_CHAOS
+
 #include "VoxelChaosTriangleMeshSceneProxy.h"
 #include "MeshBatch.h"
 #include "RawIndexBuffer.h"
@@ -200,3 +202,5 @@ SIZE_T FVoxelChaosTriangleMeshSceneProxy::GetTypeHash() const
 	static size_t UniquePointer;
 	return reinterpret_cast<size_t>(&UniquePointer);
 }
+
+#endif // !BR_OBLITERATE_CHAOS

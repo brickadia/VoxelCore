@@ -8,6 +8,7 @@
 #include "VoxelMinimal/Containers/VoxelArray.h"
 #include "VoxelMinimal/Utilities/VoxelTypeUtilities.h"
 #include "VoxelMinimal/Utilities/VoxelHashUtilities.h"
+#include "Misc/GeneratedTypeName.h"
 
 // Minimize padding by using the best of all possible permutation between Key, Value and NextElementIndex
 // In practice we only need to check two permutations:
@@ -100,6 +101,18 @@ struct FVoxelDefaultMapAllocator
 	template<typename KeyType, typename ValueType>
 	using TElementArray = TVoxelArray<TVoxelMapElement<KeyType, ValueType>>;
 };
+
+template <uint32 Alignment = DEFAULT_ALIGNMENT>
+struct TVoxelMemStackMapAllocator
+{
+	static constexpr int32 MinHashSize = 0;
+
+	using FHashArray = TVoxelArray<int32, TMemStackAllocator<Alignment>>;
+
+	template<typename KeyType, typename ValueType>
+	using TElementArray = TVoxelArray<TVoxelMapElement<KeyType, ValueType>, TMemStackAllocator<Alignment>>;
+};
+
 
 // Simple map with an array of elements and a hash table
 // The array isn't sparse, so removal will not keep order (it's basically a RemoveSwap)

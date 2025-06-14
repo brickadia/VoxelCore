@@ -1,5 +1,7 @@
 ﻿// Copyright Voxel Plugin SAS. All Rights Reserved.
 
+#if !BR_OBLITERATE_CHAOS
+
 #include "VoxelChaosTriangleMeshCooker.h"
 #include "VoxelAABBTree.h"
 #include "Chaos/TriangleMeshImplicitObject.h"
@@ -262,3 +264,5 @@ int64 FVoxelChaosTriangleMeshCooker::GetAllocatedSize(const Chaos::FTriangleMesh
 {
 	return Chaos::FTriangleMeshSweepVisitorCCD<void, void>::GetAllocatedSize(TriangleMesh);
 }
+
+#endif // !BR_OBLITERATE_CHAOS

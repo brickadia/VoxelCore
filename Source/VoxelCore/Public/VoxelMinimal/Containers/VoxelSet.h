@@ -8,6 +8,7 @@
 #include "VoxelMinimal/Utilities/VoxelTypeUtilities.h"
 #include "VoxelMinimal/Utilities/VoxelHashUtilities.h"
 #include "VoxelMinimal/Utilities/VoxelArrayUtilities.h"
+#include "Misc/GeneratedTypeName.h"
 
 template<typename Type>
 struct TVoxelSetElement
@@ -53,6 +54,17 @@ struct FVoxelDefaultSetAllocator
 
 	template<typename Type>
 	using TElementArray = TVoxelArray<TVoxelSetElement<Type>>;
+};
+
+template <uint32 Alignment = DEFAULT_ALIGNMENT>
+struct TVoxelMemStackSetAllocator
+{
+	static constexpr int32 MinHashSize = 0;
+
+	using FHashArray = TVoxelArray<int32, TMemStackAllocator<Alignment>>;
+
+	template<typename Type>
+	using TElementArray = TVoxelArray<TVoxelSetElement<Type>, TMemStackAllocator<Alignment>>;
 };
 
 // Smaller footprint than TSet

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#if !BR_OBLITERATE_CHAOS
+
 #include "VoxelMinimal.h"
 
 struct VOXELCORE_API FVoxelChaosTriangleMeshCooker
@@ -13,3 +15,5 @@ struct VOXELCORE_API FVoxelChaosTriangleMeshCooker
 
 	static int64 GetAllocatedSize(const Chaos::FTriangleMeshImplicitObject& TriangleMesh);
 };
+
+#endif // !BR_OBLITERATE_CHAOS

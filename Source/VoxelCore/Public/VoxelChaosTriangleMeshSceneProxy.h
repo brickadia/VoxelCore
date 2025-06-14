@@ -2,6 +2,8 @@
 
 #pragma once
 
+#if !BR_OBLITERATE_CHAOS
+
 #include "VoxelMinimal.h"
 #include "PrimitiveSceneProxy.h"
 
@@ -31,3 +33,5 @@ public:
 private:
 	mutable TSharedPtr<class FVoxelChaosTriangleMeshRenderData> RenderData;
 };
+
+#endif // !BR_OBLITERATE_CHAOS

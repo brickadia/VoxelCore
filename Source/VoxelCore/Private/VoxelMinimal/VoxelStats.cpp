@@ -11,7 +11,7 @@ DEFINE_STAT(STAT_VoxelLLM);
 
 // Enable by default using zero-initialization
 // This way any global calling new will register LLM scopes just in case
-bool GVoxelLLMDisabled = false;
+bool GVoxelLLMDisabled = true;
 
 thread_local int32 GVoxelLLMScopeCounter = 0;
 

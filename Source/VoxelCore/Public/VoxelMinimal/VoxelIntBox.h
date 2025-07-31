@@ -121,6 +121,22 @@ struct VOXELCORE_API FVoxelIntBox
 	{
 		return FVector(Min + Max) / 2.f;
 	}
+	FORCEINLINE FVector3f GetCenter3f() const
+	{
+		return FVector3f(Min + Max) / 2.f;
+	}
+	FORCEINLINE FVector GetExtent() const
+	{
+		return FVector(Max - Min) / 2.f;
+	}
+	FORCEINLINE FVector3f GetExtent3f() const
+	{
+		return FVector3f(Max - Min) / 2.f;
+	}
+	FORCEINLINE FIntVector GetExtentFloored() const
+	{
+		return (Max - Min) / 2;
+	}
 	FORCEINLINE double Count_double() const
 	{
 		return
@@ -537,6 +553,21 @@ struct VOXELCORE_API FVoxelIntBox
 		Min = FVoxelUtilities::ComponentMin(Min, FVoxelUtilities::FloorToInt(Point));
 		Max = FVoxelUtilities::ComponentMax(Max, FVoxelUtilities::CeilToInt(Point) + 1);
 		return *this;
+	}
+	FORCEINLINE void AddBoundaryPoint(const FIntVector& Point)
+	{
+		Min = FVoxelUtilities::ComponentMin(Min, Point);
+		Max = FVoxelUtilities::ComponentMax(Max, Point);
+	}
+	FORCEINLINE void AddBoundaryPoint(const FVector3f& Point)
+	{
+		Min = FVoxelUtilities::ComponentMin(Min, FVoxelUtilities::RoundToInt(Point));
+		Max = FVoxelUtilities::ComponentMax(Max, FVoxelUtilities::RoundToInt(Point));
+	}
+	FORCEINLINE void AddBoundaryPoint(const FVector3d& Point)
+	{
+		Min = FVoxelUtilities::ComponentMin(Min, FVoxelUtilities::RoundToInt(Point));
+		Max = FVoxelUtilities::ComponentMax(Max, FVoxelUtilities::RoundToInt(Point));
 	}
 };
 

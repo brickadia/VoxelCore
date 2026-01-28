@@ -1029,6 +1029,14 @@ public:
 #endif
 			Index--;
 		}
+
+		FORCEINLINE void SetIndex(int32 NewIndex)
+		{
+			Index = NewIndex;
+#if VOXEL_DEBUG
+			bCurrentElementRemoved = false;
+#endif
+		}
 	};
 	using FIterator = TIterator<false>;
 	using FConstIterator = TIterator<true>;

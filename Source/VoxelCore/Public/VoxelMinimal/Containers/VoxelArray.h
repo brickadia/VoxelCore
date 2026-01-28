@@ -137,6 +137,11 @@ public:
 		DestructItem(GetData() + ArrayNum - 1);
 		ArrayNum--;
 
+		if constexpr (AllocatorType::RequireZeroOnDestruct)
+		{
+			FMemory::Memzero((void*)(GetData() + ArrayNum), sizeof(ElementType));
+		}
+
 		return Result;
 	}
 
@@ -318,6 +323,11 @@ public:
 			);
 		}
 		ArrayNum -= Count;
+
+		if constexpr (AllocatorType::RequireZeroOnDestruct)
+		{
+			FMemory::Memzero((void*)(GetData() + ArrayNum), Count * sizeof(ElementType));
+		}
 	}
 	FORCEINLINE void RemoveAtSwap(SizeType Index)
 	{
@@ -336,6 +346,11 @@ public:
 		}
 
 		ArrayNum--;
+
+		if constexpr (AllocatorType::RequireZeroOnDestruct)
+		{
+			FMemory::Memzero((void*)(GetData() + ArrayNum), sizeof(ElementType));
+		}
 	}
 
 private:

@@ -305,6 +305,10 @@ void FVoxelStackTrace::Capture()
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+#if VOXEL_DEBUG
+FVoxelCounter32 GNumVoxelRefCountThis;
+#endif
+
 #if VOXEL_STATS
 TVoxelMap<FName, const FVoxelCounter64*> GVoxelStatNameToInstanceCounter;
 
@@ -330,10 +334,6 @@ public:
 	}
 	//~ End FVoxelTicker Interface
 };
-
-#if VOXEL_DEBUG
-FVoxelCounter32 GNumVoxelRefCountThis;
-#endif
 
 VOXEL_RUN_ON_STARTUP_GAME()
 {

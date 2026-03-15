@@ -872,6 +872,10 @@ public:
 	{
 		return Elements;
 	}
+	const typename Allocator::template TElementArray<Type>& HackAccessElementArray() const
+	{
+		return Elements;
+	}
 
 private:
 	typename Allocator::FHashArray HashTable;

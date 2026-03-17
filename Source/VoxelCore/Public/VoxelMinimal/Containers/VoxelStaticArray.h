@@ -120,7 +120,7 @@ public:
 	FORCEINLINE explicit TVoxelStaticArray(ENoInit)
 	{
 #if VOXEL_DEBUG
-		FVoxelUtilities::Memset(*this, 0xDE);
+		//FVoxelUtilities::Memset(*this, 0xDE);
 #endif
 	}
 

@@ -158,6 +158,11 @@ public:
 		const FVoxelBox& Box,
 		const FTransform& Transform);
 
+	FVoxelDebugDrawer& DrawBox(
+		FVector3f Center,
+		FVector3f HalfExtent,
+		FQuat4f Rotation = FQuat4f::Identity);
+
 	FVoxelDebugDrawer& DrawWireSphere(
 		const FVector& Center,
 		double Radius,

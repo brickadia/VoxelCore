@@ -231,6 +231,33 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
 	return *this;
 }
 
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
+	const FVector3f Center,
+	const FVector3f HalfExtent,
+	const FQuat4f Rotation)
+{
+	const FVoxelDebugBox BoxData
+	{
+		Center,
+		PrivateColor.R, PrivateColor.G, PrivateColor.B, 0,
+		HalfExtent,
+		Rotation.W,
+		FVector3f{ Rotation.X, Rotation.Y, Rotation.Z },
+		0.f
+	};
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundBoxes.Add(BoxData);
+	}
+	else
+	{
+		Draw->Boxes.Add(BoxData);
+	}
+
+	return *this;
+}
+
 FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireSphere(
 	const FVector& Center,
 	const double Radius,

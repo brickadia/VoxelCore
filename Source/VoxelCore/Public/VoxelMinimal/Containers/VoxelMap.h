@@ -1069,6 +1069,15 @@ public:
 		return FVoxelUtilities::HashValue(Key);
 	}
 
+	typename Allocator::template TElementArray<KeyType, ValueType>& HackAccessElementArray()
+	{
+		return Elements;
+	}
+	const typename Allocator::template TElementArray<KeyType, ValueType>& HackAccessElementArray() const
+	{
+		return Elements;
+	}
+
 private:
 	typename Allocator::FHashArray HashTable;
 	typename Allocator::template TElementArray<KeyType, ValueType> Elements;

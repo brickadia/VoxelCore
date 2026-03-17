@@ -30,6 +30,12 @@ public:
 	virtual void SubscribeToPostProcessingPass(EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) override;
 	virtual void PostRenderViewFamily_RenderThread(FRDGBuilder& GraphBuilder, FSceneViewFamily& ViewFamily) override;
 	virtual void PostRenderView_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View) override;
+
+	virtual bool ShouldCompositeEditorPrimitives_RenderThread(const FSceneView& View) const override;
+	virtual void PrepareEditorPrimitiveResources_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, FEditorPrimitiveBufferBindings& Bindings) override;
+	virtual void RenderEditorPrimitivesOpaque_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) override;
+	virtual void RenderEditorPrimitivesForegroundOverwrite_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) override;
+	virtual void RenderEditorPrimitivesForegroundDepthTest_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) override;
 	//~ End FSceneViewExtensionBase Interface
 
 private:

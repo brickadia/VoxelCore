@@ -220,3 +220,55 @@ void FVoxelSingletonSceneViewExtension::PostRenderView_RenderThread(FRDGBuilder&
 		Singleton->PostRenderView_RenderThread(GraphBuilder, View);
 	}
 }
+
+bool FVoxelSingletonSceneViewExtension::ShouldCompositeEditorPrimitives_RenderThread(const FSceneView& View) const
+{
+	for (FVoxelRenderSingleton* Singleton : Singletons)
+	{
+		if (Singleton->ShouldCompositeEditorPrimitives_RenderThread(View))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+void FVoxelSingletonSceneViewExtension::PrepareEditorPrimitiveResources_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, FEditorPrimitiveBufferBindings& Bindings)
+{
+	VOXEL_FUNCTION_COUNTER();
+
+	for (FVoxelRenderSingleton* Singleton : Singletons)
+	{
+		Singleton->PrepareEditorPrimitiveResources_RenderThread(GraphBuilder, View, Bindings);
+	}
+}
+
+void FVoxelSingletonSceneViewExtension::RenderEditorPrimitivesOpaque_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View)
+{
+	VOXEL_FUNCTION_COUNTER();
+
+	for (FVoxelRenderSingleton* Singleton : Singletons)
+	{
+		Singleton->RenderEditorPrimitivesOpaque_RenderThread(RHICmdList, View);
+	}
+}
+
+void FVoxelSingletonSceneViewExtension::RenderEditorPrimitivesForegroundOverwrite_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View)
+{
+	VOXEL_FUNCTION_COUNTER();
+
+	for (FVoxelRenderSingleton* Singleton : Singletons)
+	{
+		Singleton->RenderEditorPrimitivesForegroundOverwrite_RenderThread(RHICmdList, View);
+	}
+}
+
+void FVoxelSingletonSceneViewExtension::RenderEditorPrimitivesForegroundDepthTest_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View)
+{
+	VOXEL_FUNCTION_COUNTER();
+
+	for (FVoxelRenderSingleton* Singleton : Singletons)
+	{
+		Singleton->RenderEditorPrimitivesForegroundDepthTest_RenderThread(RHICmdList, View);
+	}
+}

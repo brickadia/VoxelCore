@@ -31,10 +31,64 @@ struct VOXELCORE_API FVoxelDebugLine
 };
 checkStatic(sizeof(FVoxelDebugLine) == 2 * sizeof(FVector4f));
 
+struct VOXELCORE_API FVoxelDebugSphere
+{
+	FVector3f Center = FVector3f(ForceInit);
+	float Radius = 0.f;
+	float Flags = 0.f;
+	float Padding2 = 0.f;
+	float Padding3 = 0.f;
+	uint8 R = 0;
+	uint8 G = 0;
+	uint8 B = 0;
+	uint8 A = 0;
+
+	static constexpr float Flag_DrawCross = 1.f;
+};
+checkStatic(sizeof(FVoxelDebugSphere) == 2 * sizeof(FVector4f));
+
+struct VOXELCORE_API FVoxelDebugSphericalSector
+{
+	FVector3f Origin = FVector3f(ForceInit);
+	float Radius = 0.f;
+	FVector3f Direction = FVector3f(ForceInit);
+	float HalfAngle = 0.f;
+	float Padding1 = 0.f;
+	float Padding2 = 0.f;
+	float Padding3 = 0.f;
+	uint8 R = 0;
+	uint8 G = 0;
+	uint8 B = 0;
+	uint8 A = 0;
+};
+checkStatic(sizeof(FVoxelDebugSphericalSector) == 3 * sizeof(FVector4f));
+
+struct VOXELCORE_API FVoxelDebugBox
+{
+	FVector3f Center = FVector3f(ForceInit);
+	uint8 R = 0;
+	uint8 G = 0;
+	uint8 B = 0;
+	uint8 A = 0;
+	FVector3f HalfExtent = FVector3f(ForceInit);
+	float QuatW = 1.f;
+	FVector3f QuatXYZ = FVector3f(ForceInit);
+	float Padding = 0.f;
+};
+checkStatic(sizeof(FVoxelDebugBox) == 3 * sizeof(FVector4f));
+
 struct VOXELCORE_API FVoxelDebugDraw
 {
 	TVoxelChunkedArray<FVoxelDebugPoint> Points;
 	TVoxelChunkedArray<FVoxelDebugLine> Lines;
+	TVoxelChunkedArray<FVoxelDebugSphere> Spheres;
+	TVoxelChunkedArray<FVoxelDebugSphericalSector> SphericalSectors;
+	TVoxelChunkedArray<FVoxelDebugBox> Boxes;
+	TVoxelChunkedArray<FVoxelDebugPoint> ForegroundPoints;
+	TVoxelChunkedArray<FVoxelDebugLine> ForegroundLines;
+	TVoxelChunkedArray<FVoxelDebugSphere> ForegroundSpheres;
+	TVoxelChunkedArray<FVoxelDebugSphericalSector> ForegroundSphericalSectors;
+	TVoxelChunkedArray<FVoxelDebugBox> ForegroundBoxes;
 };
 
 // Usage: from any thread:
@@ -69,12 +123,17 @@ public:
 
 public:
 	FVoxelDebugDrawer& Color(const FLinearColor& NewColor);
+	FVoxelDebugDrawer& Foreground();
 	FVoxelDebugDrawer& OneFrame();
 	FVoxelDebugDrawer& LifeTime(float NewLifeTime);
 
 public:
 	FVoxelDebugDrawer& DrawPoint(
 		const FVector& Position,
+		uint8 SizeInCm = 10);
+
+	FVoxelDebugDrawer& DrawPoint(
+		FVector3f Position,
 		uint8 SizeInCm = 10);
 
 	template<typename T>
@@ -87,6 +146,10 @@ public:
 		const FVector& Start,
 		const FVector& End);
 
+	FVoxelDebugDrawer& DrawLine(
+		FVector3f Start,
+		FVector3f End);
+
 	FVoxelDebugDrawer& DrawBox(
 		const FVoxelBox& Box,
 		const FMatrix& Transform);
@@ -95,9 +158,46 @@ public:
 		const FVoxelBox& Box,
 		const FTransform& Transform);
 
+	FVoxelDebugDrawer& DrawWireSphere(
+		const FVector& Center,
+		double Radius,
+		bool bDrawCross = false);
+
+	FVoxelDebugDrawer& DrawWireSphere(
+		FVector3f Center,
+		float Radius,
+		bool bDrawCross = false);
+
+	FVoxelDebugDrawer& DrawWireSphericalSector(
+		const FVector& Origin,
+		const FVector& Direction,
+		double Radius,
+		double HalfAngle);
+
+	FVoxelDebugDrawer& DrawWireSphericalSector(
+		FVector3f Origin,
+		FVector3f Direction,
+		float Radius,
+		float HalfAngle);
+
+	FVoxelDebugDrawer& DrawWireCone(
+		const FVector& Origin,
+		const FVector& Direction,
+		double Length,
+		double HalfAngleRad,
+		int32 NumSides = 16);
+
+	FVoxelDebugDrawer& DrawWireCone(
+		FVector3f Origin,
+		FVector3f Direction,
+		float Length,
+		float HalfAngleRad,
+		int32 NumSides = 16);
+
 private:
 	const TVoxelObjectPtr<const UWorld> World;
 	bool bIsOneFrame = false;
+	bool bIsForeground = false;
 	float PrivateLifeTime = -1;
 	FColor PrivateColor = FColor::Red;
 	const TSharedRef<FVoxelDebugDraw> Draw = MakeShared<FVoxelDebugDraw>();
@@ -131,7 +231,8 @@ public:
 private:
 	void IterateDraws(
 		double Time,
-		TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutDraws);
+		TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutStaticDraws,
+		TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutDynamicDraws);
 
 private:
 	FVoxelCriticalSection CriticalSection;
@@ -142,7 +243,12 @@ private:
 		double EndTime = 0;
 		TSharedPtr<const FVoxelDebugDraw> Draw;
 	};
+
+	bool IsStaticDraw(const FDraw& Draw) const;
+
 	TVoxelArray<FDraw> Draws_RequiresLock;
+
+	std::atomic<uint64> StaticGeneration{ 0 };
 
 	friend class FVoxelDebugDrawerWorldManager;
 };

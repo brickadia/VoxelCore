@@ -76,6 +76,12 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::Color(const FLinearColor& NewColor)
 	return *this;
 }
 
+FVoxelDebugDrawer& FVoxelDebugDrawer::Foreground()
+{
+	bIsForeground = true;
+	return *this;
+}
+
 FVoxelDebugDrawer& FVoxelDebugDrawer::OneFrame()
 {
 	bIsOneFrame = true;
@@ -96,14 +102,41 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawPoint(
 	const FVector& Position,
 	const uint8 SizeInCm)
 {
-	Draw->Points.Add(FVoxelDebugPoint
+	const FVoxelDebugPoint Point
 	{
 		FVector3f(Position),
 		SizeInCm,
 		PrivateColor.R,
 		PrivateColor.G,
 		PrivateColor.B
-	});
+	};
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundPoints.Add(Point);
+	}
+	else
+	{
+		Draw->Points.Add(Point);
+	}
+
+	return *this;
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawPoint(
+	const FVector3f Position,
+	const uint8 SizeInCm)
+{
+	const FVoxelDebugPoint Point{ Position, SizeInCm, PrivateColor.R, PrivateColor.G, PrivateColor.B };
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundPoints.Add(Point);
+	}
+	else
+	{
+		Draw->Points.Add(Point);
+	}
 
 	return *this;
 }
@@ -112,7 +145,7 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawLine(
 	const FVector& Start,
 	const FVector& End)
 {
-	Draw->Lines.Add(FVoxelDebugLine
+	const FVoxelDebugLine Line
 	{
 		FVector3f(Start),
 		0.f,
@@ -120,7 +153,34 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawLine(
 		PrivateColor.R,
 		PrivateColor.G,
 		PrivateColor.B
-	});
+	};
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundLines.Add(Line);
+	}
+	else
+	{
+		Draw->Lines.Add(Line);
+	}
+
+	return *this;
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawLine(
+	const FVector3f Start,
+	const FVector3f End)
+{
+	const FVoxelDebugLine Line{ Start, 0.f, End, PrivateColor.R, PrivateColor.G, PrivateColor.B };
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundLines.Add(Line);
+	}
+	else
+	{
+		Draw->Lines.Add(Line);
+	}
 
 	return *this;
 }
@@ -129,6 +189,13 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
 	const FVoxelBox& Box,
 	const FMatrix& Transform)
 {
+	return DrawBox(Box, FTransform{ Transform });
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
+	const FVoxelBox& Box,
+	const FTransform& Transform)
+{
 	VOXEL_FUNCTION_COUNTER();
 
 	if (Box.IsInfinite())
@@ -136,36 +203,161 @@ FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
 		return *this;
 	}
 
-	const auto Get = [&](const double X, const double Y, const double Z) -> FVector
+	const FVector LocalCenter = (Box.Min + Box.Max) * 0.5;
+	const FVector LocalHalfExtent = (Box.Max - Box.Min) * 0.5;
+	const FVector WorldCenter = Transform.TransformPosition(LocalCenter);
+	const FVector3f ScaledHalfExtent = FVector3f(LocalHalfExtent * Transform.GetScale3D());
+	const FQuat4f Rotation{ Transform.GetRotation() };
+
+	const FVoxelDebugBox BoxData
 	{
-		return Transform.TransformPosition(FVector(X, Y, Z));
+		FVector3f{ WorldCenter },
+		PrivateColor.R, PrivateColor.G, PrivateColor.B, 0,
+		ScaledHalfExtent,
+		Rotation.W,
+		FVector3f{ Rotation.X, Rotation.Y, Rotation.Z },
+		0.f
 	};
 
-	DrawLine(Get(Box.Min.X, Box.Min.Y, Box.Min.Z), Get(Box.Max.X, Box.Min.Y, Box.Min.Z));
-	DrawLine(Get(Box.Min.X, Box.Max.Y, Box.Min.Z), Get(Box.Max.X, Box.Max.Y, Box.Min.Z));
-	DrawLine(Get(Box.Min.X, Box.Min.Y, Box.Max.Z), Get(Box.Max.X, Box.Min.Y, Box.Max.Z));
-	DrawLine(Get(Box.Min.X, Box.Max.Y, Box.Max.Z), Get(Box.Max.X, Box.Max.Y, Box.Max.Z));
-
-	DrawLine(Get(Box.Min.X, Box.Min.Y, Box.Min.Z), Get(Box.Min.X, Box.Max.Y, Box.Min.Z));
-	DrawLine(Get(Box.Max.X, Box.Min.Y, Box.Min.Z), Get(Box.Max.X, Box.Max.Y, Box.Min.Z));
-	DrawLine(Get(Box.Min.X, Box.Min.Y, Box.Max.Z), Get(Box.Min.X, Box.Max.Y, Box.Max.Z));
-	DrawLine(Get(Box.Max.X, Box.Min.Y, Box.Max.Z), Get(Box.Max.X, Box.Max.Y, Box.Max.Z));
-
-	DrawLine(Get(Box.Min.X, Box.Min.Y, Box.Min.Z), Get(Box.Min.X, Box.Min.Y, Box.Max.Z));
-	DrawLine(Get(Box.Max.X, Box.Min.Y, Box.Min.Z), Get(Box.Max.X, Box.Min.Y, Box.Max.Z));
-	DrawLine(Get(Box.Min.X, Box.Max.Y, Box.Min.Z), Get(Box.Min.X, Box.Max.Y, Box.Max.Z));
-	DrawLine(Get(Box.Max.X, Box.Max.Y, Box.Min.Z), Get(Box.Max.X, Box.Max.Y, Box.Max.Z));
+	if (bIsForeground)
+	{
+		Draw->ForegroundBoxes.Add(BoxData);
+	}
+	else
+	{
+		Draw->Boxes.Add(BoxData);
+	}
 
 	return *this;
 }
 
-FVoxelDebugDrawer& FVoxelDebugDrawer::DrawBox(
-	const FVoxelBox& Box,
-	const FTransform& Transform)
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireSphere(
+	const FVector& Center,
+	const double Radius,
+	const bool bDrawCross)
 {
-	return DrawBox(
-		Box,
-		Transform.ToMatrixWithScale());
+	return DrawWireSphere(FVector3f(Center), static_cast<float>(Radius), bDrawCross);
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireSphere(
+	const FVector3f Center,
+	const float Radius,
+	const bool bDrawCross)
+{
+	const FVoxelDebugSphere Sphere{ Center, Radius, bDrawCross ? FVoxelDebugSphere::Flag_DrawCross : 0.f, 0.f, 0.f, PrivateColor.R, PrivateColor.G, PrivateColor.B };
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundSpheres.Add(Sphere);
+	}
+	else
+	{
+		Draw->Spheres.Add(Sphere);
+	}
+
+	return *this;
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireSphericalSector(
+	const FVector& Origin,
+	const FVector& Direction,
+	const double Radius,
+	const double HalfAngle)
+{
+	return DrawWireSphericalSector(FVector3f(Origin), FVector3f(Direction), static_cast<float>(Radius), static_cast<float>(HalfAngle));
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireSphericalSector(
+	const FVector3f Origin,
+	const FVector3f Direction,
+	const float Radius,
+	const float HalfAngle)
+{
+	const FVoxelDebugSphericalSector Sector{ Origin, Radius, Direction, HalfAngle, 0.f, 0.f, 0.f, PrivateColor.R, PrivateColor.G, PrivateColor.B };
+
+	if (bIsForeground)
+	{
+		Draw->ForegroundSphericalSectors.Add(Sector);
+	}
+	else
+	{
+		Draw->SphericalSectors.Add(Sector);
+	}
+
+	return *this;
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireCone(
+	const FVector& Origin,
+	const FVector& Direction,
+	const double Length,
+	const double HalfAngleRad,
+	const int32 NumSides)
+{
+	const FVector Dir = Direction.GetSafeNormal();
+	FVector Up, Right;
+	Dir.FindBestAxisVectors(Right, Up);
+
+	const double ConeRadius = Length * FMath::Tan(HalfAngleRad);
+	const FVector Tip = Origin;
+	const FVector BaseCenter = Origin + Dir * Length;
+	const double AngleStep = 2.0 * UE_DOUBLE_PI / NumSides;
+
+	FVector PrevPoint = BaseCenter + Right * ConeRadius;
+
+	for (int32 i = 1; i <= NumSides; ++i)
+	{
+		const double Angle = i * AngleStep;
+		const FVector Point = BaseCenter + (Right * FMath::Cos(Angle) + Up * FMath::Sin(Angle)) * ConeRadius;
+
+		// Base circle segment
+		DrawLine(PrevPoint, Point);
+
+		// Side line from tip
+		if (i % FMath::Max(1, NumSides / 4) == 0)
+		{
+			DrawLine(Tip, Point);
+		}
+
+		PrevPoint = Point;
+	}
+
+	return *this;
+}
+
+FVoxelDebugDrawer& FVoxelDebugDrawer::DrawWireCone(
+	const FVector3f Origin,
+	const FVector3f Direction,
+	const float Length,
+	const float HalfAngleRad,
+	const int32 NumSides)
+{
+	const FVector3f Dir = Direction.GetSafeNormal();
+	FVector3f Up, Right;
+	Dir.FindBestAxisVectors(Right, Up);
+
+	const float ConeRadius = Length * FMath::Tan(HalfAngleRad);
+	const FVector3f BaseCenter = Origin + Dir * Length;
+	const float AngleStep = 2.f * UE_PI / NumSides;
+
+	FVector3f PreviousPoint = BaseCenter + Right * ConeRadius;
+
+	for (int32 SideIndex = 1; SideIndex <= NumSides; ++SideIndex)
+	{
+		const float Angle = SideIndex * AngleStep;
+		const FVector3f Point = BaseCenter + (Right * FMath::Cos(Angle) + Up * FMath::Sin(Angle)) * ConeRadius;
+
+		DrawLine(PreviousPoint, Point);
+
+		if (SideIndex % FMath::Max(1, NumSides / 4) == 0)
+		{
+			DrawLine(Origin, Point);
+		}
+
+		PreviousPoint = Point;
+	}
+
+	return *this;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -187,6 +379,7 @@ void FVoxelDebugDrawGroup::Clear_AnyThread()
 	VOXEL_SCOPE_LOCK(CriticalSection);
 
 	Draws_RequiresLock.Empty();
+	StaticGeneration.fetch_add(1, std::memory_order_relaxed);
 }
 
 void FVoxelDebugDrawGroup::AddDraw_AnyThread(
@@ -197,12 +390,13 @@ void FVoxelDebugDrawGroup::AddDraw_AnyThread(
 	VOXEL_FUNCTION_COUNTER();
 	VOXEL_SCOPE_LOCK(CriticalSection);
 
-	Draws_RequiresLock.Add(FDraw
-		{
-			bIsOneFrame,
-			EndTime,
-			Draw
-		});
+	const FDraw NewDraw{ bIsOneFrame, EndTime, Draw };
+	Draws_RequiresLock.Add(NewDraw);
+
+	if (IsStaticDraw(NewDraw))
+	{
+		StaticGeneration.fetch_add(1, std::memory_order_relaxed);
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -243,9 +437,15 @@ void FVoxelDebugDrawGroup::PushGroup_EnsureNew_AnyThread(const UWorld* World)
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
+bool FVoxelDebugDrawGroup::IsStaticDraw(const FDraw& Draw) const
+{
+	return !Draw.bIsOneFrame && Draw.EndTime == MAX_dbl;
+}
+
 void FVoxelDebugDrawGroup::IterateDraws(
 	const double Time,
-	TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutDraws)
+	TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutStaticDraws,
+	TVoxelArray<TSharedPtr<const FVoxelDebugDraw>>& OutDynamicDraws)
 {
 	VOXEL_SCOPE_LOCK(CriticalSection);
 
@@ -253,14 +453,21 @@ void FVoxelDebugDrawGroup::IterateDraws(
 	{
 		const FDraw& Draw = Draws_RequiresLock[Index];
 
-		// Always render at least once
-		OutDraws.Add(Draw.Draw);
-
-		if (Draw.bIsOneFrame ||
-			(!GVoxelFreezeDebugDraws && Draw.EndTime < Time))
+		if (IsStaticDraw(Draw))
 		{
-			Draws_RequiresLock.RemoveAtSwap(Index);
-			Index--;
+			OutStaticDraws.Add(Draw.Draw);
+		}
+		else
+		{
+			// Always render at least once
+			OutDynamicDraws.Add(Draw.Draw);
+
+			if (Draw.bIsOneFrame ||
+				(!GVoxelFreezeDebugDraws && Draw.EndTime < Time))
+			{
+				Draws_RequiresLock.RemoveAtSwap(Index);
+				Index--;
+			}
 		}
 	}
 }

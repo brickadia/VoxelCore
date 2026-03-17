@@ -69,4 +69,10 @@ public:
 	virtual void SubscribeToPostProcessingPass_RenderThread(ISceneViewExtension::EPostProcessingPass Pass, FAfterPassCallbackDelegateArray& InOutPassCallbacks, bool bIsPassEnabled) {}
 	virtual void PostRenderViewFamily_RenderThread(FRDGBuilder& GraphBuilder, FSceneViewFamily& ViewFamily) {}
 	virtual void PostRenderView_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View) {}
+
+	virtual bool ShouldCompositeEditorPrimitives_RenderThread(const FSceneView& View) const { return false; }
+	virtual void PrepareEditorPrimitiveResources_RenderThread(FRDGBuilder& GraphBuilder, const FSceneView& View, FSceneViewExtensionBase::FEditorPrimitiveBufferBindings& Bindings) {}
+	virtual void RenderEditorPrimitivesOpaque_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) {}
+	virtual void RenderEditorPrimitivesForegroundOverwrite_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) {}
+	virtual void RenderEditorPrimitivesForegroundDepthTest_RenderThread(FRHICommandList& RHICmdList, const FSceneView& View) {}
 };

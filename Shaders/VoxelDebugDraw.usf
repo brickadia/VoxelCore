@@ -73,8 +73,14 @@ void PointVS(
 	const float4 TranslatedWorldPos = float4(TranslatedWorldPosition, 1.0);
 	float4 ViewPos = mul(TranslatedWorldPos, DFHackToFloat(PrimaryView.TranslatedWorldToView));
 
-	// Billboard the quad in view space
-	ViewPos.xy += QuadVertex * Size;
+	// Billboard the quad in view space with minimum screen size
+	const float MinScreenSize = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
+	const float ScreenSize = Size * DFHackToFloat(PrimaryView.ViewToClip)[0][0] / abs(ViewPos.z);
+	const float PixelSize = ScreenSize * PrimaryView.ViewSizeAndInvSize.y * 0.5;
+	const float FinalSize = PixelSize < MinScreenSize
+		? MinScreenSize * abs(ViewPos.z) / (DFHackToFloat(PrimaryView.ViewToClip)[0][0] * PrimaryView.ViewSizeAndInvSize.y * 0.5)
+		: Size;
+	ViewPos.xy += QuadVertex * FinalSize;
 
 	// Project to screen
 	Output.Position = mul(ViewPos, DFHackToFloat(PrimaryView.ViewToClip));
@@ -94,39 +100,30 @@ void PointPS(
 #endif
 )
 {
-	// Create circular points by discarding pixels outside circle
 	const float2 CenteredUV = Input.UV * 2.0 - 1.0;
 	const float DistFromCenter = length(CenteredUV);
 
-	// Discard pixels outside circle (optional, comment out for squares)
-	if (DistFromCenter > 1.0)
+	// Smooth edge for alpha-to-coverage MSAA
+	const float EdgeWidth = fwidth(DistFromCenter);
+	const float Alpha = 1.0 - smoothstep(1.0 - EdgeWidth, 1.0, DistFromCenter);
+
+	if (Alpha <= 0.0)
 	{
 		discard;
 	}
 
-	// Calculate sphere normal from UV (assuming sphere surface)
-	// Z component calculated to make unit sphere
 	const float ZComponent = sqrt(max(0.0, 1.0 - DistFromCenter * DistFromCenter));
 	const float3 SphereNormal = float3(CenteredUV.x, CenteredUV.y, ZComponent);
 
-	// Simple directional lighting (light coming from top-right)
 	const float3 LightDir = normalize(float3(0.5, 0.5, 0.8));
 	const float NdotL = max(0.0, dot(SphereNormal, LightDir));
 
-	// Ambient + diffuse lighting
-	const float Ambient = 0.3;
-	const float Diffuse = 0.7;
-	const float LightIntensity = Ambient + Diffuse * NdotL;
+	const float LightIntensity = 0.3 + 0.7 * NdotL;
+	const float RimLight = pow(1.0 - ZComponent, 2.0) * 0.2;
 
-	// Add subtle rim lighting for better depth perception
-	const float RimFactor = 1.0 - ZComponent;
-	const float RimLight = pow(RimFactor, 2.0) * 0.2;
-
-	// Apply lighting to color
 	float3 ShadedColor = Input.Color * LightIntensity + RimLight;
 
-	// Output color with shading
-	OutColor = float4(ShadedColor, 1.f);
+	OutColor = float4(ShadedColor, Alpha);
 
 #if WRITE_TO_SHADING_MODEL
 	SetGBufferForUnlit(OutGBufferB);
@@ -218,18 +215,6 @@ void LineVS(
 	StartView.xyz = LineStart;
 	EndView.xyz = LineEnd;
 
-	// Calculate adaptive thickness based on distance
-	// Use nearest point distance for consistent thickness along the line
-	float NearestZ = min(abs(StartView.z), abs(EndView.z));
-
-	// Fixed thickness with adaptive scaling based on distance
-	// This creates a "biased perspective" effect
-	const float BaseThickness = 4.0; // Base thickness in pixels
-	const float MinScale = 0.5; // Minimum scale at far distance
-	const float MaxScale = 5.0; // Maximum scale when very close
-	const float DistanceScale = clamp(100.0 / NearestZ, MinScale, MaxScale);
-	const float AdjustedThickness = BaseThickness * DistanceScale;
-
 	// Project to screen space to calculate expansion direction
 	const float4 StartClip = mul(StartView, DFHackToFloat(PrimaryView.ViewToClip));
 	const float4 EndClip = mul(EndView, DFHackToFloat(PrimaryView.ViewToClip));
@@ -246,14 +231,20 @@ void LineVS(
 	// Perpendicular direction for line expansion
 	const float2 LinePerpendicular = float2(-LineDir.y, LineDir.x);
 
-	// Convert thickness from pixels to NDC
-	// Account for viewport size (approximation using typical 1920x1080)
-	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
-
 	// Generate quad vertices (4 vertices, 2 triangles)
 	const uint Vid = VertexId % 4;
 	const bool bIsEnd = (Vid >= 2);
 	const bool bIsRight = (Vid == 1 || Vid == 3);
+
+	// Per-vertex adaptive thickness based on each endpoint's distance
+	// Scale base thickness relative to 1080p so lines look the same at any resolution
+	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
+	const float MinScale = 0.25;
+	const float MaxScale = 5.0;
+	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
+	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
+	const float AdjustedThickness = BaseThickness * DistanceScale;
+	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
 
 	// Select vertex position
 	const float4 ClipPos = bIsEnd ? EndClip : StartClip;
@@ -271,6 +262,530 @@ void LineVS(
 }
 
 void LinePS(
+	FVoxelDebugLineVSToPS Input,
+	out float4 OutColor : SV_Target0
+#if WRITE_TO_SHADING_MODEL
+	,out float4 OutGBufferB : SV_Target1
+#endif
+)
+{
+	OutColor = float4(Input.Color, 1.0);
+
+#if WRITE_TO_SHADING_MODEL
+	SetGBufferForUnlit(OutGBufferB);
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+#define NUM_SPHERE_SEGMENTS 24
+#define NUM_SPHERE_CIRCLES 3
+#define NUM_SPHERE_CIRCLE_QUADS (NUM_SPHERE_CIRCLES * NUM_SPHERE_SEGMENTS)
+
+Buffer<float4> SphereDataBuffer;
+
+void SphereVS(
+	uint VertexId : SV_VertexID,
+	uint InstanceId : SV_InstanceID,
+	out FVoxelDebugLineVSToPS Output)
+{
+	// Load sphere data: 2 float4s per sphere
+	const float4 Data0 = SphereDataBuffer[InstanceId * 2 + 0]; // Center.xyz, Radius
+	const float4 Data1 = SphereDataBuffer[InstanceId * 2 + 1]; // Flags, Padding, Padding, PackedColor
+
+	const float3 SphereCenter = Data0.xyz;
+	const float SphereRadius = Data0.w;
+	const bool bDrawCross = Data1.x >= 1.0;
+
+	float3 Color;
+	{
+		const uint PackedColor = asuint(Data1.w);
+		Color.r = float((PackedColor >> 0) & 0xFF) / 255.0;
+		Color.g = float((PackedColor >> 8) & 0xFF) / 255.0;
+		Color.b = float((PackedColor >> 16) & 0xFF) / 255.0;
+	}
+
+	const uint QuadIndex = VertexId / 4;
+	const uint QuadCorner = VertexId % 4;
+
+	float3 StartWorld, EndWorld;
+
+	if (QuadIndex >= NUM_SPHERE_CIRCLE_QUADS)
+	{
+		// Cross lines (quads 72, 73, 74)
+		if (!bDrawCross)
+		{
+			Output.Position = asfloat(0x7FC00000); // NaN — cull
+			Output.Color = float3(0, 0, 0);
+			Output.UV = float2(0, 0);
+			return;
+		}
+
+		const uint CrossAxis = QuadIndex - NUM_SPHERE_CIRCLE_QUADS;
+		const float3 Axis = CrossAxis == 0 ? float3(1, 0, 0) : CrossAxis == 1 ? float3(0, 1, 0) : float3(0, 0, 1);
+		StartWorld = SphereCenter - Axis * SphereRadius;
+		EndWorld   = SphereCenter + Axis * SphereRadius;
+	}
+	else
+	{
+		// Circle segments
+		const uint CircleIndex = QuadIndex / NUM_SPHERE_SEGMENTS;
+		const uint SegmentIndex = QuadIndex % NUM_SPHERE_SEGMENTS;
+
+		const float Angle0 = SegmentIndex * (2.0 * PI / NUM_SPHERE_SEGMENTS);
+		const float Angle1 = (SegmentIndex + 1) * (2.0 * PI / NUM_SPHERE_SEGMENTS);
+		float S0, C0, S1, C1;
+		sincos(Angle0, S0, C0);
+		sincos(Angle1, S1, C1);
+
+		if (CircleIndex == 0)
+		{
+			StartWorld = SphereCenter + float3(C0, S0, 0) * SphereRadius;
+			EndWorld   = SphereCenter + float3(C1, S1, 0) * SphereRadius;
+		}
+		else if (CircleIndex == 1)
+		{
+			StartWorld = SphereCenter + float3(C0, 0, S0) * SphereRadius;
+			EndWorld   = SphereCenter + float3(C1, 0, S1) * SphereRadius;
+		}
+		else
+		{
+			StartWorld = SphereCenter + float3(0, C0, S0) * SphereRadius;
+			EndWorld   = SphereCenter + float3(0, C1, S1) * SphereRadius;
+		}
+	}
+
+	// From here: same line-expansion logic as LineVS
+
+	const FDFVector3 PreViewTranslation = MakeDFVector3(DFHackToFloat(PrimaryView.PreViewTranslationHigh), DFHackToFloat(PrimaryView.PreViewTranslationLow));
+	const float3 StartTranslated = DFFastAddDemote(StartWorld, PreViewTranslation);
+	const float3 EndTranslated = DFFastAddDemote(EndWorld, PreViewTranslation);
+
+	float4 StartView = mul(float4(StartTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+	float4 EndView = mul(float4(EndTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+
+	// Clamp line to frustum planes in view space
+	float3 LineStart = StartView.xyz;
+	float3 LineEnd = EndView.xyz;
+
+	for (int PlaneIndex = 0; PlaneIndex < 4; PlaneIndex++)
+	{
+		const float4 Plane = FrustumPlanes[PlaneIndex];
+
+		const float DistStart = dot(LineStart, Plane.xyz) - Plane.w;
+		const float DistEnd = dot(LineEnd, Plane.xyz) - Plane.w;
+
+		if (DistStart > 0.0 && DistEnd > 0.0)
+		{
+			Output.Position = float4(0, 0, 0, 1);
+			Output.Color = float3(0, 0, 0);
+			Output.UV = float2(0, 0);
+			return;
+		}
+
+		if (DistStart * DistEnd < 0.0)
+		{
+			const float t = DistStart / (DistStart - DistEnd);
+			const float3 IntersectionPoint = lerp(LineStart, LineEnd, t);
+
+			if (DistStart > 0.0)
+			{
+				LineStart = IntersectionPoint;
+			}
+			else
+			{
+				LineEnd = IntersectionPoint;
+			}
+		}
+	}
+
+	StartView.xyz = LineStart;
+	EndView.xyz = LineEnd;
+
+	const float4 StartClip = mul(StartView, DFHackToFloat(PrimaryView.ViewToClip));
+	const float4 EndClip = mul(EndView, DFHackToFloat(PrimaryView.ViewToClip));
+
+	const float2 StartNDC = StartClip.xy / StartClip.w;
+	const float2 EndNDC = EndClip.xy / EndClip.w;
+
+	float2 LineDir = EndNDC - StartNDC;
+	const float LineLength = length(LineDir);
+	LineDir = LineLength > 0.0001 ? LineDir / LineLength : float2(1, 0);
+
+	const float2 LinePerpendicular = float2(-LineDir.y, LineDir.x);
+
+	const bool bIsEnd = (QuadCorner >= 2);
+	const bool bIsRight = (QuadCorner == 1 || QuadCorner == 3);
+
+	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
+	const float MinScale = 0.25;
+	const float MaxScale = 5.0;
+	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
+	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
+	const float AdjustedThickness = BaseThickness * DistanceScale;
+	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
+
+	const float4 ClipPos = bIsEnd ? EndClip : StartClip;
+	float2 NDCPos = bIsEnd ? EndNDC : StartNDC;
+
+	NDCPos += LinePerpendicular * ThicknessNDC * (bIsRight ? 1.0 : -1.0) * 0.5;
+
+	Output.Position = float4(NDCPos * ClipPos.w, ClipPos.z, ClipPos.w);
+	Output.Color = Color;
+	Output.UV = float2(bIsEnd ? 1.0 : 0.0, bIsRight ? 1.0 : 0.0);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+// Box: 12 edges from center + quat rotation + half extents
+// Edges: 4 along each axis (X, Y, Z)
+//   Quad 0..3:   edges along X (varying Y/Z sign combos)
+//   Quad 4..7:   edges along Y (varying X/Z sign combos)
+//   Quad 8..11:  edges along Z (varying X/Y sign combos)
+
+Buffer<float4> BoxDataBuffer;
+
+float3 QuatRotateVector(float4 Q, float3 V)
+{
+	const float3 T = 2.0 * cross(Q.xyz, V);
+	return V + Q.w * T + cross(Q.xyz, T);
+}
+
+void BoxVS(
+	uint VertexId : SV_VertexID,
+	uint InstanceId : SV_InstanceID,
+	out FVoxelDebugLineVSToPS Output)
+{
+	const float4 Data0 = BoxDataBuffer[InstanceId * 3 + 0]; // Center.xyz, PackedColor
+	const float4 Data1 = BoxDataBuffer[InstanceId * 3 + 1]; // HalfExtent.xyz, QuatW
+	const float4 Data2 = BoxDataBuffer[InstanceId * 3 + 2]; // Quat.xyz, padding
+
+	const float3 Center = Data0.xyz;
+	const float3 HalfExtent = Data1.xyz;
+	const float4 Q = float4(Data2.xyz, Data1.w);
+
+	float3 Color;
+	{
+		const uint PackedColor = asuint(Data0.w);
+		Color.r = float((PackedColor >> 0) & 0xFF) / 255.0;
+		Color.g = float((PackedColor >> 8) & 0xFF) / 255.0;
+		Color.b = float((PackedColor >> 16) & 0xFF) / 255.0;
+	}
+
+	// Compute oriented axes
+	const float3 AxisX = QuatRotateVector(Q, float3(HalfExtent.x, 0, 0));
+	const float3 AxisY = QuatRotateVector(Q, float3(0, HalfExtent.y, 0));
+	const float3 AxisZ = QuatRotateVector(Q, float3(0, 0, HalfExtent.z));
+
+	const uint QuadIndex = VertexId / 4;
+	const uint QuadCorner = VertexId % 4;
+
+	// 12 edges: 4 per axis direction
+	// Each edge varies one axis from -1 to +1, the other two are fixed at ±1
+	const uint AxisGroup = QuadIndex / 4;  // 0=X edges, 1=Y edges, 2=Z edges
+	const uint EdgeInGroup = QuadIndex % 4; // which of the 4 parallel edges
+	const float SignA = (EdgeInGroup & 1) ? 1.0 : -1.0;
+	const float SignB = (EdgeInGroup & 2) ? 1.0 : -1.0;
+
+	float3 StartWorld, EndWorld;
+
+	if (AxisGroup == 0)
+	{
+		// Edges along X: fix Y(SignA), Z(SignB)
+		StartWorld = Center - AxisX + AxisY * SignA + AxisZ * SignB;
+		EndWorld   = Center + AxisX + AxisY * SignA + AxisZ * SignB;
+	}
+	else if (AxisGroup == 1)
+	{
+		// Edges along Y: fix X(SignA), Z(SignB)
+		StartWorld = Center + AxisX * SignA - AxisY + AxisZ * SignB;
+		EndWorld   = Center + AxisX * SignA + AxisY + AxisZ * SignB;
+	}
+	else
+	{
+		// Edges along Z: fix X(SignA), Y(SignB)
+		StartWorld = Center + AxisX * SignA + AxisY * SignB - AxisZ;
+		EndWorld   = Center + AxisX * SignA + AxisY * SignB + AxisZ;
+	}
+
+	// Line expansion (same as other primitives)
+
+	const FDFVector3 PreViewTranslation = MakeDFVector3(DFHackToFloat(PrimaryView.PreViewTranslationHigh), DFHackToFloat(PrimaryView.PreViewTranslationLow));
+	const float3 StartTranslated = DFFastAddDemote(StartWorld, PreViewTranslation);
+	const float3 EndTranslated = DFFastAddDemote(EndWorld, PreViewTranslation);
+
+	float4 StartView = mul(float4(StartTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+	float4 EndView = mul(float4(EndTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+
+	float3 LineStart = StartView.xyz;
+	float3 LineEnd = EndView.xyz;
+
+	for (int PlaneIndex = 0; PlaneIndex < 4; PlaneIndex++)
+	{
+		const float4 Plane = FrustumPlanes[PlaneIndex];
+		const float DistStart = dot(LineStart, Plane.xyz) - Plane.w;
+		const float DistEnd = dot(LineEnd, Plane.xyz) - Plane.w;
+
+		if (DistStart > 0.0 && DistEnd > 0.0)
+		{
+			Output.Position = float4(0, 0, 0, 1);
+			Output.Color = float3(0, 0, 0);
+			Output.UV = float2(0, 0);
+			return;
+		}
+
+		if (DistStart * DistEnd < 0.0)
+		{
+			const float t = DistStart / (DistStart - DistEnd);
+			const float3 IntersectionPoint = lerp(LineStart, LineEnd, t);
+			if (DistStart > 0.0) { LineStart = IntersectionPoint; }
+			else { LineEnd = IntersectionPoint; }
+		}
+	}
+
+	StartView.xyz = LineStart;
+	EndView.xyz = LineEnd;
+
+	const float4 StartClip = mul(StartView, DFHackToFloat(PrimaryView.ViewToClip));
+	const float4 EndClip = mul(EndView, DFHackToFloat(PrimaryView.ViewToClip));
+	const float2 StartNDC = StartClip.xy / StartClip.w;
+	const float2 EndNDC = EndClip.xy / EndClip.w;
+
+	float2 LineDir = EndNDC - StartNDC;
+	const float LineLength = length(LineDir);
+	LineDir = LineLength > 0.0001 ? LineDir / LineLength : float2(1, 0);
+	const float2 LinePerpendicular = float2(-LineDir.y, LineDir.x);
+
+	const bool bIsEnd = (QuadCorner >= 2);
+	const bool bIsRight = (QuadCorner == 1 || QuadCorner == 3);
+
+	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
+	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
+	const float DistanceScale = clamp(100.0 / VertexZ, 0.25, 5.0);
+	const float AdjustedThickness = BaseThickness * DistanceScale;
+	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
+
+	const float4 ClipPos = bIsEnd ? EndClip : StartClip;
+	float2 NDCPos = bIsEnd ? EndNDC : StartNDC;
+	NDCPos += LinePerpendicular * ThicknessNDC * (bIsRight ? 1.0 : -1.0) * 0.5;
+
+	Output.Position = float4(NDCPos * ClipPos.w, ClipPos.z, ClipPos.w);
+	Output.Color = Color;
+	Output.UV = float2(bIsEnd ? 1.0 : 0.0, bIsRight ? 1.0 : 0.0);
+}
+
+void BoxPS(
+	FVoxelDebugLineVSToPS Input,
+	out float4 OutColor : SV_Target0
+#if WRITE_TO_SHADING_MODEL
+	,out float4 OutGBufferB : SV_Target1
+#endif
+)
+{
+	OutColor = float4(Input.Color, 1.0);
+#if WRITE_TO_SHADING_MODEL
+	SetGBufferForUnlit(OutGBufferB);
+#endif
+}
+
+void SpherePS(
+	FVoxelDebugLineVSToPS Input,
+	out float4 OutColor : SV_Target0
+#if WRITE_TO_SHADING_MODEL
+	,out float4 OutGBufferB : SV_Target1
+#endif
+)
+{
+	OutColor = float4(Input.Color, 1.0);
+
+#if WRITE_TO_SHADING_MODEL
+	SetGBufferForUnlit(OutGBufferB);
+#endif
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+// Spherical sector: cone with spherical cap
+// Quad layout (60 total):
+//   0..23:  base circle (24 segments)
+//   24..27: 4 side lines (origin to cone edge)
+//   28..43: arc on Right plane (16 segments)
+//   44..59: arc on Up plane (16 segments)
+
+#define NUM_SECTOR_BASE_SEGMENTS 24
+#define NUM_SECTOR_SIDE_LINES 4
+#define NUM_SECTOR_ARC_SEGMENTS 16
+
+Buffer<float4> SectorDataBuffer;
+
+void SphericalSectorVS(
+	uint VertexId : SV_VertexID,
+	uint InstanceId : SV_InstanceID,
+	out FVoxelDebugLineVSToPS Output)
+{
+	// Load sector data: 3 float4s per sector
+	const float4 Data0 = SectorDataBuffer[InstanceId * 3 + 0]; // Origin.xyz, Radius
+	const float4 Data1 = SectorDataBuffer[InstanceId * 3 + 1]; // Direction.xyz, HalfAngle
+	const float4 Data2 = SectorDataBuffer[InstanceId * 3 + 2]; // Padding.xyz, PackedColor
+
+	const float3 Origin = Data0.xyz;
+	const float Radius = Data0.w;
+	const float3 Dir = normalize(Data1.xyz);
+	const float HalfAngle = Data1.w;
+
+	float3 Color;
+	{
+		const uint PackedColor = asuint(Data2.w);
+		Color.r = float((PackedColor >> 0) & 0xFF) / 255.0;
+		Color.g = float((PackedColor >> 8) & 0xFF) / 255.0;
+		Color.b = float((PackedColor >> 16) & 0xFF) / 255.0;
+	}
+
+	// Compute orthonormal basis from Direction
+	const float3 UpHint = abs(Dir.z) < 0.999 ? float3(0, 0, 1) : float3(1, 0, 0);
+	const float3 Right = normalize(cross(UpHint, Dir));
+	const float3 Up = cross(Dir, Right);
+
+	// Cone geometry
+	float SinHalf, CosHalf;
+	sincos(HalfAngle, SinHalf, CosHalf);
+	const float ConeBaseRadius = Radius * SinHalf;
+	const float AxisLength = Radius * CosHalf;
+	const float3 BaseCenter = Origin + Dir * AxisLength;
+
+	const uint QuadIndex = VertexId / 4;
+	const uint QuadCorner = VertexId % 4;
+
+	float3 StartWorld, EndWorld;
+
+	if (QuadIndex < NUM_SECTOR_BASE_SEGMENTS)
+	{
+		// Base circle
+		const uint Seg = QuadIndex;
+		const float A0 = Seg * (2.0 * PI / NUM_SECTOR_BASE_SEGMENTS);
+		const float A1 = (Seg + 1) * (2.0 * PI / NUM_SECTOR_BASE_SEGMENTS);
+		float S0, C0, S1, C1;
+		sincos(A0, S0, C0);
+		sincos(A1, S1, C1);
+
+		StartWorld = BaseCenter + (Right * C0 + Up * S0) * ConeBaseRadius;
+		EndWorld   = BaseCenter + (Right * C1 + Up * S1) * ConeBaseRadius;
+	}
+	else if (QuadIndex < NUM_SECTOR_BASE_SEGMENTS + NUM_SECTOR_SIDE_LINES)
+	{
+		// Side lines from origin to cone edge
+		const uint Side = QuadIndex - NUM_SECTOR_BASE_SEGMENTS;
+		const float SideAngle = Side * (PI / 2.0);
+		float SS, SC;
+		sincos(SideAngle, SS, SC);
+
+		StartWorld = Origin;
+		EndWorld = BaseCenter + (Right * SC + Up * SS) * ConeBaseRadius;
+	}
+	else
+	{
+		// Sphere arcs
+		const uint ArcQuad = QuadIndex - NUM_SECTOR_BASE_SEGMENTS - NUM_SECTOR_SIDE_LINES;
+		const uint ArcIndex = ArcQuad / NUM_SECTOR_ARC_SEGMENTS; // 0 = Right, 1 = Up
+		const uint ArcSeg = ArcQuad % NUM_SECTOR_ARC_SEGMENTS;
+		const float3 Axis = ArcIndex == 0 ? Right : Up;
+
+		const float T0 = -HalfAngle + (2.0 * HalfAngle * ArcSeg) / NUM_SECTOR_ARC_SEGMENTS;
+		const float T1 = -HalfAngle + (2.0 * HalfAngle * (ArcSeg + 1)) / NUM_SECTOR_ARC_SEGMENTS;
+		float ST0, CT0, ST1, CT1;
+		sincos(T0, ST0, CT0);
+		sincos(T1, ST1, CT1);
+
+		StartWorld = Origin + (Dir * CT0 + Axis * ST0) * Radius;
+		EndWorld   = Origin + (Dir * CT1 + Axis * ST1) * Radius;
+	}
+
+	// Line expansion (same as LineVS / SphereVS)
+
+	const FDFVector3 PreViewTranslation = MakeDFVector3(DFHackToFloat(PrimaryView.PreViewTranslationHigh), DFHackToFloat(PrimaryView.PreViewTranslationLow));
+	const float3 StartTranslated = DFFastAddDemote(StartWorld, PreViewTranslation);
+	const float3 EndTranslated = DFFastAddDemote(EndWorld, PreViewTranslation);
+
+	float4 StartView = mul(float4(StartTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+	float4 EndView = mul(float4(EndTranslated, 1.0), DFHackToFloat(PrimaryView.TranslatedWorldToView));
+
+	float3 LineStart = StartView.xyz;
+	float3 LineEnd = EndView.xyz;
+
+	for (int PlaneIndex = 0; PlaneIndex < 4; PlaneIndex++)
+	{
+		const float4 Plane = FrustumPlanes[PlaneIndex];
+
+		const float DistStart = dot(LineStart, Plane.xyz) - Plane.w;
+		const float DistEnd = dot(LineEnd, Plane.xyz) - Plane.w;
+
+		if (DistStart > 0.0 && DistEnd > 0.0)
+		{
+			Output.Position = float4(0, 0, 0, 1);
+			Output.Color = float3(0, 0, 0);
+			Output.UV = float2(0, 0);
+			return;
+		}
+
+		if (DistStart * DistEnd < 0.0)
+		{
+			const float t = DistStart / (DistStart - DistEnd);
+			const float3 IntersectionPoint = lerp(LineStart, LineEnd, t);
+
+			if (DistStart > 0.0)
+			{
+				LineStart = IntersectionPoint;
+			}
+			else
+			{
+				LineEnd = IntersectionPoint;
+			}
+		}
+	}
+
+	StartView.xyz = LineStart;
+	EndView.xyz = LineEnd;
+
+	const float4 StartClip = mul(StartView, DFHackToFloat(PrimaryView.ViewToClip));
+	const float4 EndClip = mul(EndView, DFHackToFloat(PrimaryView.ViewToClip));
+
+	const float2 StartNDC = StartClip.xy / StartClip.w;
+	const float2 EndNDC = EndClip.xy / EndClip.w;
+
+	float2 LineDir = EndNDC - StartNDC;
+	const float LineLength = length(LineDir);
+	LineDir = LineLength > 0.0001 ? LineDir / LineLength : float2(1, 0);
+
+	const float2 LinePerpendicular = float2(-LineDir.y, LineDir.x);
+
+	const bool bIsEnd = (QuadCorner >= 2);
+	const bool bIsRight = (QuadCorner == 1 || QuadCorner == 3);
+
+	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
+	const float MinScale = 0.25;
+	const float MaxScale = 5.0;
+	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
+	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
+	const float AdjustedThickness = BaseThickness * DistanceScale;
+	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
+
+	const float4 ClipPos = bIsEnd ? EndClip : StartClip;
+	float2 NDCPos = bIsEnd ? EndNDC : StartNDC;
+
+	NDCPos += LinePerpendicular * ThicknessNDC * (bIsRight ? 1.0 : -1.0) * 0.5;
+
+	Output.Position = float4(NDCPos * ClipPos.w, ClipPos.z, ClipPos.w);
+	Output.Color = Color;
+	Output.UV = float2(bIsEnd ? 1.0 : 0.0, bIsRight ? 1.0 : 0.0);
+}
+
+void SphericalSectorPS(
 	FVoxelDebugLineVSToPS Input,
 	out float4 OutColor : SV_Target0
 #if WRITE_TO_SHADING_MODEL

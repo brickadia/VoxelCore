@@ -161,7 +161,7 @@ FVoxelFuture FVoxelUtilities::AsyncCopyTexture(
 		{
 			VOXEL_FUNCTION_COUNTER();
 
-			const TRefCountPtr<FRHITexture> UploadTextureRHI = RHICreateTexture(
+			const TRefCountPtr<FRHITexture> UploadTextureRHI = RHICmdList.CreateTexture(
 				FRHITextureCreateDesc::Create2D(TEXT("AsyncCopyTexture"))
 				.SetExtent(SizeX, SizeY)
 				.SetFormat(Format)

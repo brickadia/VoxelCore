@@ -128,7 +128,9 @@ protected:
 	{
 		if constexpr (IsDerivedFromSharedFromThis<T>())
 		{
-			Object->UpdateWeakReferenceInternal(&ReinterpretCastRef<const TSharedPtr<T>>(SharedPtr), static_cast<T*>(SharedPtr.Get()));
+			// 5.8 made UpdateWeakReferenceInternal private + changed signature; go through the
+			// SharedReferencer-taking EnableSharedFromThis via VoxelObjectHelpers.h layout helper.
+			VoxelPrivate::TriggerEnableSharedFromThisFromPtr(ReinterpretCastRef<const TSharedPtr<T>>(SharedPtr), static_cast<T*>(SharedPtr.Get()));
 		}
 	}
 
@@ -160,7 +162,7 @@ private:
 		} \
 		\
 		TSharedRef<VOXEL_THIS_TYPE> SharedRef = StaticCastSharedRef<VOXEL_THIS_TYPE>(MakeSharedCopy_Generic()); \
-		SharedPointerInternals::EnableSharedFromThis(&SharedRef, &SharedRef.Get()); \
+		VoxelPrivate::TriggerEnableSharedFromThis(SharedRef); \
 		return SharedRef; \
 	} \
 	template<typename T> \
@@ -176,7 +178,7 @@ private:
 	}
 
 #define GENERATED_VIRTUAL_STRUCT_BODY_NO_COPY(Parent) \
-	virtual UScriptStruct* PREPROCESSOR_JOIN(Internal_GetStruct, Parent)() const override { return StaticStruct(); } \
+	virtual UScriptStruct* UE_JOIN(Internal_GetStruct, Parent)() const override { return StaticStruct(); } \
 	virtual void Internal_UpdateWeakReferenceInternal(const TSharedPtr<FVoxelVirtualStruct>& SharedPtr) \
 	{ \
 		FVoxelVirtualStruct::Internal_UpdateWeakReferenceInternal(SharedPtr, this); \

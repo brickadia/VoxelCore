@@ -121,8 +121,8 @@ FORCEINLINE bool VoxelScopeCounterCondition(const int32 Num, const int32 Thresho
 #define VOXEL_SCOPE_COUNTER_NUM(Name, Num, ...) VOXEL_SCOPE_COUNTER_FNAME_COND(VoxelScopeCounterCondition(Num, ##__VA_ARGS__), VoxelStats_AddNum(STATIC_FSTRING(Name), Num))
 #define VOXEL_FUNCTION_COUNTER_NUM(Num, ...) VOXEL_SCOPE_COUNTER_NUM(VOXEL_STATS_CLEAN_FUNCTION_NAME, Num, ##__VA_ARGS__)
 
-#define VOXEL_LOG_FUNCTION_STATS() FScopeLogTime PREPROCESSOR_JOIN(FScopeLogTime_, __LINE__)(*STATIC_FSTRING(VOXEL_STATS_CLEAN_FUNCTION_NAME));
-#define VOXEL_LOG_SCOPE_STATS(Name) FScopeLogTime PREPROCESSOR_JOIN(FScopeLogTime_, __LINE__)(*STATIC_FSTRING(VOXEL_STATS_CLEAN_FUNCTION_NAME + "." + FString(Name)));
+#define VOXEL_LOG_FUNCTION_STATS() FScopeLogTime UE_JOIN(FScopeLogTime_, __LINE__)(*STATIC_FSTRING(VOXEL_STATS_CLEAN_FUNCTION_NAME));
+#define VOXEL_LOG_SCOPE_STATS(Name) FScopeLogTime UE_JOIN(FScopeLogTime_, __LINE__)(*STATIC_FSTRING(VOXEL_STATS_CLEAN_FUNCTION_NAME + "." + FString(Name)));
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

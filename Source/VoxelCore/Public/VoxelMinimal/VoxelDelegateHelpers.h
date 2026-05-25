@@ -91,17 +91,10 @@ public:
 
 public:
 	//~ Begin IBaseDelegateInstance Interface
-	virtual void CreateCopy(TDelegateBase<FThreadSafeDelegateMode>& Base) const override
+	// 5.8 collapsed the three TDelegateBase<Mode>& overloads into a single FPrivateDelegateAllocation target.
+	virtual void CreateCopy(const FPrivateDelegateAllocation& Target) const override
 	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
-	}
-	virtual void CreateCopy(TDelegateBase<FNotThreadSafeDelegateMode>& Base) const override
-	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
-	}
-	virtual void CreateCopy(TDelegateBase<FNotThreadSafeNotCheckedDelegateMode>& Base) const override
-	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
+		new (Target) TSharedPtrLambdaDelegateInstance(*this);
 	}
 
 	virtual ReturnType Execute(ArgTypes... Args) const override
@@ -451,17 +444,10 @@ public:
 
 public:
 	//~ Begin IBaseDelegateInstance Interface
-	virtual void CreateCopy(TDelegateBase<FThreadSafeDelegateMode>& Base) const override
+	// 5.8 collapsed the three TDelegateBase<Mode>& overloads into a single FPrivateDelegateAllocation target.
+	virtual void CreateCopy(const FPrivateDelegateAllocation& Target) const override
 	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
-	}
-	virtual void CreateCopy(TDelegateBase<FNotThreadSafeDelegateMode>& Base) const override
-	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
-	}
-	virtual void CreateCopy(TDelegateBase<FNotThreadSafeNotCheckedDelegateMode>& Base) const override
-	{
-		FVoxelDelegateUtilities::CreateDelegateInstance(Base, *this);
+		new (Target) TForwardDelegateInstance(*this);
 	}
 
 	virtual ReturnType Execute(ArgTypes... Args) const override

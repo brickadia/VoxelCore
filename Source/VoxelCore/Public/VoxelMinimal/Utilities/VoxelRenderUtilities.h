@@ -23,7 +23,7 @@ FORCEINLINE void RHIUpdateTexture2D_Unsafe(
 	const uint32 SourcePitch,
 	const uint8* SourceData)
 {
-	RHIUpdateTexture2D(
+	FRHICommandListImmediate::Get().UpdateTexture2D(
 		Texture,
 		MipIndex,
 		UpdateRegion,

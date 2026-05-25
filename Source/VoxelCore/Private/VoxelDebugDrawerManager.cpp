@@ -373,7 +373,7 @@ static void RenderPointsInternal(
 	const TShaderMapRef<FVoxelDebugPointVS> VertexShader(ShaderMap);
 	const TShaderMapRef<FVoxelDebugPointPS> PixelShader(ShaderMap);
 
-	RDG_GPU_STAT_SCOPE(GraphBuilder, VoxelDebugDrawPoints);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, VoxelDebugDrawPoints, "VoxelDebugDrawPoints");
 
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("%s", EventName),
@@ -504,7 +504,7 @@ static void RenderLinesInternal(
 		return;
 	}
 
-	const FMatrix Matrix = View.ViewMatrices.GetProjectionMatrix();
+	const FMatrix Matrix = View.ViewMatrices.GetViewToClip();
 
 	FPlane LeftPlane(ForceInit);
 	FPlane RightPlane(ForceInit);
@@ -523,7 +523,7 @@ static void RenderLinesInternal(
 	const TShaderMapRef<FVoxelDebugLineVS> VertexShader(ShaderMap);
 	const TShaderMapRef<FVoxelDebugLinePS> PixelShader(ShaderMap);
 
-	RDG_GPU_STAT_SCOPE(GraphBuilder, VoxelDebugDrawLines);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, VoxelDebugDrawLines, "VoxelDebugDrawLines");
 
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("%s", EventName),
@@ -647,7 +647,7 @@ static void RenderSpheresInternal(
 		return;
 	}
 
-	const FMatrix Matrix = View.ViewMatrices.GetProjectionMatrix();
+	const FMatrix Matrix = View.ViewMatrices.GetViewToClip();
 
 	FPlane LeftPlane(ForceInit);
 	FPlane RightPlane(ForceInit);
@@ -666,7 +666,7 @@ static void RenderSpheresInternal(
 	const TShaderMapRef<FVoxelDebugSphereVS> VertexShader(ShaderMap);
 	const TShaderMapRef<FVoxelDebugSpherePS> PixelShader(ShaderMap);
 
-	RDG_GPU_STAT_SCOPE(GraphBuilder, VoxelDebugDrawSpheres);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, VoxelDebugDrawSpheres, "VoxelDebugDrawSpheres");
 
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("%s", EventName),
@@ -790,7 +790,7 @@ static void RenderBoxesInternal(
 		return;
 	}
 
-	const FMatrix Matrix = View.ViewMatrices.GetProjectionMatrix();
+	const FMatrix Matrix = View.ViewMatrices.GetViewToClip();
 
 	FPlane LeftPlane(ForceInit);
 	FPlane RightPlane(ForceInit);
@@ -809,7 +809,7 @@ static void RenderBoxesInternal(
 	const TShaderMapRef<FVoxelDebugBoxVS> VertexShader(ShaderMap);
 	const TShaderMapRef<FVoxelDebugBoxPS> PixelShader(ShaderMap);
 
-	RDG_GPU_STAT_SCOPE(GraphBuilder, VoxelDebugDrawBoxes);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, VoxelDebugDrawBoxes, "VoxelDebugDrawBoxes");
 
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("%s", EventName),
@@ -933,7 +933,7 @@ static void RenderSphericalSectorsInternal(
 		return;
 	}
 
-	const FMatrix Matrix = View.ViewMatrices.GetProjectionMatrix();
+	const FMatrix Matrix = View.ViewMatrices.GetViewToClip();
 
 	FPlane LeftPlane(ForceInit);
 	FPlane RightPlane(ForceInit);
@@ -952,7 +952,7 @@ static void RenderSphericalSectorsInternal(
 	const TShaderMapRef<FVoxelDebugSphericalSectorVS> VertexShader(ShaderMap);
 	const TShaderMapRef<FVoxelDebugSphericalSectorPS> PixelShader(ShaderMap);
 
-	RDG_GPU_STAT_SCOPE(GraphBuilder, VoxelDebugDrawSphericalSectors);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, VoxelDebugDrawSphericalSectors, "VoxelDebugDrawSphericalSectors");
 
 	GraphBuilder.AddPass(
 		RDG_EVENT_NAME("%s", EventName),
@@ -1578,7 +1578,7 @@ static void DrawWithSRV(
 
 	auto SetFrustumPlanes = [&](auto& OutPlanes)
 	{
-		const FMatrix Matrix = View.ViewMatrices.GetProjectionMatrix();
+		const FMatrix Matrix = View.ViewMatrices.GetViewToClip();
 		FPlane LeftPlane(ForceInit), RightPlane(ForceInit), TopPlane(ForceInit), BottomPlane(ForceInit);
 		Matrix.GetFrustumLeftPlane(LeftPlane);
 		Matrix.GetFrustumRightPlane(RightPlane);

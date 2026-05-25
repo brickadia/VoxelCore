@@ -414,13 +414,50 @@ FProperty& FindFPropertyChecked_Impl(const FName Name)
 VOXELCORE_API FSharedVoidRef MakeSharedStruct(const UScriptStruct* Struct, const void* StructToCopyFrom = nullptr);
 VOXELCORE_API FSharedVoidRef MakeShareableStruct(const UScriptStruct* Struct, void* StructMemory);
 
+// UE 5.8 made SharedPointerInternals::EnableSharedFromThis require access to TSharedRef's private
+// SharedReferenceCount member. Voxel reinterprets a void TSharedRef into a typed one (which bypasses
+// the normal constructor path that fires EnableSharedFromThis), then needs to wire up the
+// TSharedFromThis weak pointer manually. Use a layout-compatible mirror struct to reach the private
+// referencer. TSharedRef has had this { Object*, FSharedReferencer } layout since UE 4.x.
+namespace VoxelPrivate
+{
+	template<typename T, ESPMode Mode = ESPMode::ThreadSafe>
+	struct TSharedRefLayoutAccess
+	{
+		T* Object;
+		SharedPointerInternals::FSharedReferencer<Mode> SharedReferenceCount;
+	};
+
+	template<typename T>
+	FORCEINLINE void TriggerEnableSharedFromThis(TSharedRef<T>& SharedRef)
+	{
+		static_assert(sizeof(TSharedRefLayoutAccess<T>) == sizeof(TSharedRef<T>), "TSharedRef layout changed; VoxelPrivate::TSharedRefLayoutAccess needs an update.");
+		TSharedRefLayoutAccess<T>& Access = reinterpret_cast<TSharedRefLayoutAccess<T>&>(SharedRef);
+		SharedPointerInternals::EnableSharedFromThis(Access.SharedReferenceCount, &SharedRef.Get());
+	}
+
+	// TSharedPtr has the same { ObjectType*, FSharedReferencer } layout as TSharedRef. The Object pointer
+	// can be null though, so callers must verify before relying on the reinterpreted object.
+	template<typename T>
+	FORCEINLINE void TriggerEnableSharedFromThisFromPtr(const TSharedPtr<T>& SharedPtr, T* Object)
+	{
+		if (!Object)
+		{
+			return;
+		}
+		static_assert(sizeof(TSharedRefLayoutAccess<T>) == sizeof(TSharedPtr<T>), "TSharedPtr layout changed; VoxelPrivate::TSharedRefLayoutAccess needs an update.");
+		const TSharedRefLayoutAccess<T>& Access = reinterpret_cast<const TSharedRefLayoutAccess<T>&>(SharedPtr);
+		SharedPointerInternals::EnableSharedFromThis(const_cast<SharedPointerInternals::FSharedReferencer<ESPMode::ThreadSafe>&>(Access.SharedReferenceCount), Object);
+	}
+}
+
 template<typename T>
 TSharedRef<T> MakeSharedStruct(const UScriptStruct* Struct, const T* StructToCopyFrom = nullptr)
 {
 	checkVoxelSlow(Struct->IsChildOf(StaticStructFast<T>()));
 
 	TSharedRef<T> SharedRef = ReinterpretCastRef<TSharedRef<T>>(MakeSharedStruct(Struct, static_cast<const void*>(StructToCopyFrom)));
-	SharedPointerInternals::EnableSharedFromThis(&SharedRef, &SharedRef.Get());
+	VoxelPrivate::TriggerEnableSharedFromThis(SharedRef);
 	return SharedRef;
 }
 

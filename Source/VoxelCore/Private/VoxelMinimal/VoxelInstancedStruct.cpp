@@ -7,6 +7,7 @@
 #include "Engine/PackageMapClient.h"
 #include "UObject/UObjectThreadContext.h"
 #include "StructUtils/StructUtilsTypes.h"
+#include "StructUtils/StructReinstancer.h"
 #include "StructUtils/UserDefinedStruct.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
@@ -390,100 +391,16 @@ void FVoxelInstancedStruct::AddStructReferencedObjects(FReferenceCollector& Coll
 	// See FInstancedStruct::AddStructReferencedObjects
 
 	// Reference collector is used to visit all instances of instanced structs and replace their contents.
-	if (const UUserDefinedStruct* StructureToReinstance = UE::StructUtils::Private::GetStructureToReinstantiate())
+	if (UE::StructUtils::FStructReinstancer* Reinstancer = UE::StructUtils::FStructReinstancer::GetInstance())
 	{
-		check(IsInGameThread());
-
-		if (const UUserDefinedStruct* UserDefinedStruct = Cast<UUserDefinedStruct>(GetScriptStruct()))
+		if (const UScriptStruct* ScriptStruct = GetScriptStruct();
+			ScriptStruct && Reinstancer->IsReinstanting(ScriptStruct))
 		{
-			if (StructureToReinstance->Status == UDSS_Duplicate)
+			Reinstancer->MarkAsRequiresReinstantiation();
+			// It is not necessary to change the struct to a duplicated one, but it helps with tracking mistakes and prevents memory stomps.
+			if (const UScriptStruct* Duplicated = Reinstancer->GetDuplicatedReinstantingStruct(ScriptStruct))
 			{
-				// On the first pass we replace the UDS with a duplicate that represents the currently allocated struct.
-				// GStructureToReinstance is the duplicated struct, and StructureToReinstance->PrimaryStruct is the UDS that is being reinstanced.
-
-				if (UserDefinedStruct == StructureToReinstance->PrimaryStruct)
-				{
-					PrivateScriptStruct = ConstCast(StructureToReinstance);
-				}
-			}
-			else
-			{
-				// On the second pass we reinstantiate the data using serialization.
-				// When saving, the UDSs are written using the duplicate which represents current layout, but PrimaryStruct is serialized as the type.
-				// When reading, the data is initialized with the new type, and the serialization will take care of reading from the old data.
-
-				// See FVoxelInstancedStruct::Serialize
-
-				if (UserDefinedStruct->PrimaryStruct == StructureToReinstance)
-				{
-					if (UObject* Outer = UE::StructUtils::Private::GetCurrentReinstantiationOuterObject())
-					{
-						if (!Outer->IsA<UClass>() && !Outer->HasAnyFlags(RF_ClassDefaultObject))
-						{
-							(void)Outer->MarkPackageDirty();
-						}
-					}
-
-					checkVoxelSlow(PrivateScriptStruct == UserDefinedStruct);
-
-					TArray<uint8> Data;
-
-					{
-						FMemoryWriter Writer(Data);
-						FObjectAndNameAsStringProxyArchive WriterProxy(Writer, true);
-						Serialize(WriterProxy);
-					}
-
-					if (ensure(PrivateStructMemory.IsUnique()))
-					{
-						// Force destroy the old struct using the old destructor
-
-						extern TVoxelUniqueFunction<void(const UScriptStruct* Struct, void* StructMemory)> GVoxelDestroyStructOverride;
-
-						check(IsInGameThread());
-						check(!GVoxelDestroyStructOverride);
-
-						bool bCalled = false;
-
-						void* StructMemoryToDestroy = PrivateStructMemory.Get();
-
-						GVoxelDestroyStructOverride = [&](const UScriptStruct* Struct, void* StructMemory)
-						{
-							if (StructMemory != StructMemoryToDestroy)
-							{
-								// Recursive call
-								Struct->DestroyStruct(StructMemory);
-								return;
-							}
-
-							check(Struct == UserDefinedStruct->PrimaryStruct);
-
-							ensure(!bCalled);
-							bCalled = true;
-
-							UserDefinedStruct->DestroyStruct(StructMemory);
-						};
-
-						PrivateStructMemory.Reset();
-
-						ensure(bCalled);
-						GVoxelDestroyStructOverride = {};
-					}
-					else
-					{
-						// Keep this alive forever, as the destructor is unsafe to call
-						(void)MakeUniqueCopy(PrivateStructMemory).Release();
-						PrivateStructMemory.Reset();
-					}
-
-					{
-						FMemoryReader Reader(Data);
-						FObjectAndNameAsStringProxyArchive ReaderProxy(Reader, true);
-						Serialize(ReaderProxy);
-					}
-
-					checkVoxelSlow(PrivateScriptStruct == UserDefinedStruct->PrimaryStruct);
-				}
+				PrivateScriptStruct = ConstCast(Duplicated);
 			}
 		}
 	}

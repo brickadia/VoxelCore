@@ -18,10 +18,10 @@ void FVoxelInstancedStructCustomization::CustomizeHeader(
 	StructProperty = PropertyHandle;
 	RefreshDelegate = FVoxelEditorUtilities::MakeRefreshDelegate(this, CustomizationUtils);
 
-	FCoreUObjectDelegates::OnObjectsReinstanced.Add(MakeWeakDelegateDelegate(RefreshDelegate, [RefreshDelegate = RefreshDelegate](const FCoreUObjectDelegates::FReplacementObjectMap&)
+	FCoreUObjectDelegates::OnObjectsReinstanced.AddLambda([RefreshDelegate = RefreshDelegate](const FCoreUObjectDelegates::FReplacementObjectMap&)
 	{
-		RefreshDelegate.Execute();
-	}));
+		RefreshDelegate.ExecuteIfBound();
+	});
 
 	if (PropertyHandle->HasMetaData("ShowOnlyInnerProperties"))
 	{

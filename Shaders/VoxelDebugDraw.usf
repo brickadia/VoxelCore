@@ -240,7 +240,7 @@ void LineVS(
 	// Scale base thickness relative to 1080p so lines look the same at any resolution
 	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
 	const float MinScale = 0.25;
-	const float MaxScale = 5.0;
+	const float MaxScale = 1.0;
 	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
 	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
 	const float AdjustedThickness = BaseThickness * DistanceScale;
@@ -421,7 +421,7 @@ void SphereVS(
 
 	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
 	const float MinScale = 0.25;
-	const float MaxScale = 5.0;
+	const float MaxScale = 1.0;
 	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
 	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
 	const float AdjustedThickness = BaseThickness * DistanceScale;
@@ -565,7 +565,7 @@ void BoxVS(
 
 	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
 	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
-	const float DistanceScale = clamp(100.0 / VertexZ, 0.25, 5.0);
+	const float DistanceScale = clamp(100.0 / VertexZ, 0.25, 1.0);
 	const float AdjustedThickness = BaseThickness * DistanceScale;
 	const float2 ThicknessNDC = (AdjustedThickness / PrimaryView.ViewSizeAndInvSize.xy) * 2.0;
 
@@ -769,7 +769,7 @@ void SphericalSectorVS(
 
 	const float BaseThickness = 4.0 * (PrimaryView.ViewSizeAndInvSize.y / 1080.0);
 	const float MinScale = 0.25;
-	const float MaxScale = 5.0;
+	const float MaxScale = 1.0;
 	const float VertexZ = abs(bIsEnd ? EndView.z : StartView.z);
 	const float DistanceScale = clamp(100.0 / VertexZ, MinScale, MaxScale);
 	const float AdjustedThickness = BaseThickness * DistanceScale;

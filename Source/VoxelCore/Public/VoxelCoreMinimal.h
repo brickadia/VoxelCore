@@ -118,7 +118,7 @@ FORCEINLINE void Swap(T* RESTRICT& A, T* RESTRICT& B)
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-#if PLATFORM_ANDROID || (defined(PLATFORM_PS4) && PLATFORM_PS4) || (defined(PLATFORM_PS5) && PLATFORM_PS5)
+#if PLATFORM_ANDROID || (defined(PLATFORM_PS4) && PLATFORM_PS4)
 namespace std
 {
 	template<typename DerivedType, typename BaseType>
